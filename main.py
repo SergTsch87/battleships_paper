@@ -24,10 +24,16 @@ pygame.init()
 class Board:
     def __init__(self, size = BOARD_SIZE) -> None:
         self.size = size
-        self.board = [["" for _ in range(size)] for _ in range(size)]
+        
+            # self.board = [["" for _ in range(size)] for _ in range(size)]
+        # Швидший аналог цього коду:
+        row = [''] * size
+        self.board = [row[:] for _ in range(size)]
+        
 
     def reset(self):
-        self.board = [["" for _ in range(self.size)] for _ in range(self.size)]
+        row = [''] * self.size
+        self.board = [row[:] for _ in range(self.size)]
 
     # draw_x / draw_hit / draw_x_hit
     def draw_x_hit(self, screen, col, row):
@@ -70,6 +76,7 @@ class Board:
 
     def check_win(self):
         pass
+        # Чи є хоч один цілий корабель суперника?
 
 
 # для гравця (наприклад, людина або комп’ютер)
@@ -98,6 +105,23 @@ class Game:
 
     def process_turn():
         pass
+        # Виграв / Не виграв / Зміна гравця
+        # Покроковий процес гри
+
+        # 1) Кожен гравець розставляє свої кораблі
+        # 2) Перевірка розміщення кораблів за правилами
+        # 3) Вибір гравця / Зміна гравця
+        # 4) Показ поля суперника з його прихованими цілими та поціленими кораблями
+        # 5) Курсором / Вводом у консоль  задаємо координати пострілу
+
+        # 6) Якщо влучив:
+        #      Якщо є цілий корабель суперника:
+        #          go to: 4
+        #      Інакше:
+        #          Цей гравець переміг!)
+        #   Інакше (не влучив):
+        #          go to: 3
+             
 
     def change_color(self, rect, mouse_pos):
         if rect.collidepoint(mouse_pos):
@@ -119,6 +143,8 @@ class Game:
                 if event.type == pygame.QUIT:
                     running = False
                 
+                # Обробка курсору та малювання дошки
+
                 mouse_pos = pygame.mouse.get_pos()
                 # Очищення екрану
                 self.screen.fill(WHITE)
@@ -139,6 +165,14 @@ class Game:
 
         pygame.quit()
         sys.exit()
+
+
+class Ship:
+    def __init__(self, size, state, x, y) -> None:
+        self.size = size
+        self.state = state # norm / hit / sink
+        self.x = x
+        self.y = y
 
 
 def main():
