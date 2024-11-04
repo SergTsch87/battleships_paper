@@ -29,6 +29,10 @@ class Board:
         # Швидший аналог цього коду:
         row = [''] * size
         self.board = [row[:] for _ in range(size)]
+        self.ships = [] # Додаємо список для кораблів
+
+    def add_ship(self, ship):
+        self.ships.append(ship)
         
 
     def reset(self):
@@ -37,15 +41,15 @@ class Board:
 
     # draw_x / draw_hit / draw_x_hit
     def draw_x_hit(self, screen, col, row):
-        pygame.draw.line(screen, RED, (col * CELL_SIZE + 10, row * CELL_SIZE + 5), 
-                                      ((col + 1) * CELL_SIZE - 10, (row + 1) * CELL_SIZE - 5), LINE_WIDTH)
+        pygame.draw.line(screen, RED, (col * CELL_SIZE + 20, row * CELL_SIZE + 20), 
+                                      ((col + 1) * CELL_SIZE - 20, (row + 1) * CELL_SIZE - 20), LINE_WIDTH)
         
-        pygame.draw.line(screen, RED, (col * CELL_SIZE + 10, (row + 1) * CELL_SIZE - 5),
-                                      ((col + 1) * CELL_SIZE - 10, row * CELL_SIZE + 5), LINE_WIDTH)
+        pygame.draw.line(screen, RED, (col * CELL_SIZE + 20, (row + 1) * CELL_SIZE - 20),
+                                      ((col + 1) * CELL_SIZE - 20, row * CELL_SIZE + 20), LINE_WIDTH)
 
     # draw_dot / draw_miss / draw_dot_miss
     def draw_dot_miss(self, screen, col, row):
-        pygame.draw.circle(screen, BLUE, (col * CELL_SIZE + CELL_SIZE // 2, row * CELL_SIZE + CELL_SIZE // 10), (CELL_SIZE // 10 - 5), LINE_WIDTH)
+        pygame.draw.circle(screen, BLUE, (col * CELL_SIZE + CELL_SIZE // 2, row * CELL_SIZE + CELL_SIZE // 4), (CELL_SIZE // 4 + 1), LINE_WIDTH)
 
     def draw_x_or_dot(self, screen, row, col):
         if self.board[row][col] == "X":
@@ -75,8 +79,11 @@ class Board:
         return False
 
     def check_win(self):
-        pass
-        # Чи є хоч один цілий корабель суперника?
+        for ship in self.ships:
+            if ship.state != 'sink':  # Якщо є хоча б один не потоплений корабель
+                return False
+        
+        return True # Якщо усі кораблі потоплені
 
 
 # для гравця (наприклад, людина або комп’ютер)
@@ -90,38 +97,46 @@ class Game:
         pygame.display.set_caption("Battleships Paper Grid")
         self.board = Board()
         self.players = [Player("I"), Player("Other")]
-        self.currrent_player_index = 0
+        self.current_player_index = 0
         self.game_over = False
         self.winner = None
 
     def reset(self):
         self.board.reset()
-        self.currrent_player_index = 0
+        self.current_player_index = 0
         self.game_over = False
         self.winner = None
 
     def switch_player(self): # 0 or 1  >>>  "I" or "Other"
-        self.currrent_player_index = 1 - self.currrent_player_index
+        self.current_player_index = 1 - self.current_player_index
 
-    def process_turn():
-        pass
-        # Виграв / Не виграв / Зміна гравця
-        # Покроковий процес гри
+    def process_turn(self, row, col):
+        current_player = self.players[self.current_player_index]
+        opponent_board = self.board if self.current_player_index == 1 else self.board  # передбачено дві дошки
 
-        # 1) Кожен гравець розставляє свої кораблі
-        # 2) Перевірка розміщення кораблів за правилами
-        # 3) Вибір гравця / Зміна гравця
-        # 4) Показ поля суперника з його прихованими цілими та поціленими кораблями
-        # 5) Курсором / Вводом у консоль  задаємо координати пострілу
+        if opponent_board.board[row][col] == '':  # Промах
+            opponent_board.update(row, col, '.')
+            self.switch_player()
+            return False  # Гра продовжується
+        
+        elif opponent_board.board[row][col] == 'S':  # Влучив у корабель
+            opponent_board.update(row, col, 'X')
+            for ship in opponent_board.ships:
+                if ship.contains_position(row, col):
+                    ship.hit()
+                    if ship.is_sunk():
+                        # Позначаємо знищений корабель, та змінюємо його стан
+                        ship.state = 'sink'
+                    break
+            # Перевірка на перемогу
+            if opponent_board.check_win():
+                self.game_over = True
+                self.winner = current_player.symbol
+            
+            return True # Гра триває
+        
+        return False
 
-        # 6) Якщо влучив:
-        #      Якщо є цілий корабель суперника:
-        #          go to: 4
-        #      Інакше:
-        #          Цей гравець переміг!)
-        #   Інакше (не влучив):
-        #          go to: 3
-             
 
     def change_color(self, rect, mouse_pos):
         if rect.collidepoint(mouse_pos):
@@ -150,6 +165,14 @@ class Game:
                 self.screen.fill(WHITE)
                 
                 self.change_color_for_rects(mouse_pos)
+
+                # Temp:
+                # for row in range(BOARD_SIZE):
+                #     for col in range(BOARD_SIZE):
+                #         if col <= 5:
+                #             self.board.draw_x_hit(self.screen, col, row)
+                #         else:
+                #             self.board.draw_dot_miss(self.screen, col, row)
                     
                 # if event.type == pygame.MOUSEBUTTONDOWN and not self.game_over:
                 #     mouse_x, mouse_y = event.pos
@@ -168,11 +191,34 @@ class Game:
 
 
 class Ship:
-    def __init__(self, size, state, x, y) -> None:
+    def __init__(self, size, x, y, orientation) -> None:
         self.size = size
-        self.state = state # norm / hit / sink
-        self.x = x
-        self.y = y
+        self.hits = 0
+        self.state = 'norm' # Початковий стан корабля   norm / hit / sink
+        self.positions = self.calculate_positions(x, y, orientation)
+
+    def calculate_positions(self, x, y, orientation):
+        positions = []
+        if orientation == 'horz':
+            for i in range(self.size):
+                positions.append((x, y + i))
+        
+        else:  # orientation == 'vert'
+            for i in range(self.size):
+                positions.append((x + i, y))
+        
+        return positions
+    
+    def contains_position(self, row, col):
+        return (row, col) in self.positions
+    
+    def hit(self):
+        self.hits += 1
+        if self.hits == self.size:
+            self.state = 'sink'
+
+    def is_sunk(self):
+        return self.state == 'sink'
 
 
 def main():
